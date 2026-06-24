@@ -282,7 +282,7 @@ memory_system = DBConversationMemory(db, logger)
 
 os.makedirs("faces", exist_ok=True)
 
-WEATHER_API_KEY = os.getenv("WEATHER_API_KEY")
+WEATHER_API_KEY = os.getenv("WEATHER_API_KEY") or os.getenv("OPENWEATHER_API_KEY")
 NEWS_API_KEY = os.getenv("NEWS_API_KEY")
 weather_cache: Dict[str, Any] = {}
 news_cache: Dict[str, Any] = {}
