@@ -209,7 +209,7 @@ function App() {
         iconBg: 'rgba(58,175,169,0.1)',
         cardBg: 'linear-gradient(145deg, #FFFFFF 0%, #E5F5F4 100%)',
         border: 'rgba(58,175,169,0.2)',
-        onClick: handleNewFamily,
+        onClick: () => { setMode('register'); setMessage(''); },
         delay: '0.45s', idleDelay: '2.2s',
       },
       {
