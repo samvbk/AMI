@@ -46,7 +46,7 @@ Thumbs.db
 conversation_memory.json
 
 # Media uploads and cache
-#backend/audio/
+backend/audio/
 
 backend/faces/
 

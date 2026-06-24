@@ -1,44 +1,34 @@
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
 python-multipart==0.0.6
-
-
-google-generativeai==0.3.2
+mysql-connector-python==8.2.0
 python-dotenv==1.0.0
+pydantic==2.4.2
+PyJWT==2.8.0
+slowapi==0.1.9
+cryptography==41.0.7
+python-json-logger==2.0.7
+gunicorn==21.2.0
 
-face-recognition==1.3.0
-face-recognition-models==0.3.0
+# Generative AI
+google-generativeai==0.3.2
 
+# Image Processing & Face Detection
 opencv-python==4.8.1.78
 opencv-contrib-python==4.8.1.78
-
 numpy==1.24.3
 Pillow==10.1.0
+
+# Optional high-accuracy face recognition engine.
+# On Windows, insightface may require Microsoft C++ Build Tools to install.
+# The backend falls back to OpenCV when these packages are not available.
+# insightface==0.7.3
+# onnxruntime==1.17.3
+
+# Networking & APIs
 requests==2.31.0
 
+# Audio & Voice Processing
 gtts==2.4.0
 SpeechRecognition==3.10.0
 pydub==0.25.1
-
-fastapi==0.104.1
-uvicorn[standard]==0.24.0
-mysql-connector-python==8.2.0
-google-generativeai==0.3.2
-python-multipart==0.0.6
-python-dotenv==1.0.0
-requests==2.31.0
-pillow==10.1.0
-numpy==1.24.3
-opencv-python==4.8.1.78
-
-fastapi==0.104.1
-uvicorn[standard]==0.24.0
-opencv-python==4.8.1.78
-face-recognition==1.3.0
-numpy==1.24.3
-Pillow==10.0.1
-python-dotenv==1.0.0
-requests==2.31.0
-google-generativeai==0.3.0
-python-multipart==0.0.6
-pydantic==2.4.2

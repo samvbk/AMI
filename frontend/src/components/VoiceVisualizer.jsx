@@ -6,6 +6,31 @@ export default function VoiceVisualizer({ isListening, isSpeaking, audioLevel, u
   const barsRef = useRef(Array.from({ length: 64 }, () => 0));
 
   useEffect(() => {
+    let audioContext;
+    let analyser;
+    let microphone;
+    let dataArray;
+    let stream;
+
+    const setupAudio = async () => {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        analyser = audioContext.createAnalyser();
+        analyser.fftSize = 128; // 64 frequency bins
+        microphone = audioContext.createMediaStreamSource(stream);
+        microphone.connect(analyser);
+        dataArray = new Uint8Array(analyser.frequencyBinCount);
+      } catch (err) {
+        console.error("Error setting up Web Audio API:", err);
+      }
+    };
+
+    // Only set up microphone if listening
+    if (isListening) {
+      setupAudio();
+    }
+
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
     
@@ -25,8 +50,16 @@ export default function VoiceVisualizer({ isListening, isSpeaking, audioLevel, u
       const radius = 80;
       const barCount = barsRef.current.length;
       
-      // Update bars based on audio level
-      if (isSpeaking || (isListening && userEngaged)) {
+      // Update bars based on REAL audio level
+      if (analyser && isListening) {
+        analyser.getByteFrequencyData(dataArray);
+        barsRef.current = barsRef.current.map((_, i) => {
+          // Normalize byte to 0-1 and scale
+          const target = (dataArray[i] / 255) * 80; 
+          return target;
+        });
+      } else if (isSpeaking) {
+        // Fallback or simulated for speaking if we don't have speaker loopback
         barsRef.current = barsRef.current.map((bar, i) => {
           const target = audioLevel * 100 * (0.5 + Math.sin(i * 0.3 + time * 0.005) * 0.5);
           return bar + (target - bar) * 0.1;
@@ -99,8 +132,14 @@ export default function VoiceVisualizer({ isListening, isSpeaking, audioLevel, u
     animationRef.current = requestAnimationFrame(drawVisualizer);
 
     return () => {
-      window.removeEventListener('resize', resizeCanvas);
       cancelAnimationFrame(animationRef.current);
+      window.removeEventListener('resize', resizeCanvas);
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+      }
+      if (audioContext && audioContext.state !== 'closed') {
+        audioContext.close();
+      }
     };
   }, [isListening, isSpeaking, audioLevel, userEngaged]);
 

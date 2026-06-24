@@ -2,6 +2,7 @@
 import mysql.connector
 from config import config
 import time
+import os
 
 def get_db():
     max_retries = 3
@@ -19,7 +20,11 @@ def get_db():
                 db_url = db_url.replace('mysql://', '')
                 if '@' in db_url:
                     auth_part, host_part = db_url.split('@')
-                    user, password = auth_part.split(':')
+                    if ':' in auth_part:
+                        user, password = auth_part.split(':', 1)
+                    else:
+                        user = auth_part
+                        password = os.getenv('DB_PASSWORD', '')
                     host_port_db = host_part.split('/')
                     host_port = host_port_db[0]
                     database = host_port_db[1] if len(host_port_db) > 1 else 'healthcare'
@@ -32,18 +37,18 @@ def get_db():
                         port = 3306
                 else:
                     # Fallback to defaults
-                    user = 'root'
-                    password = '9850337042'
-                    host = 'localhost'
-                    port = 3306
-                    database = 'healthcare'
+                    user = os.getenv('DB_USER', 'root')
+                    password = os.getenv('DB_PASSWORD', '')
+                    host = os.getenv('DB_HOST', 'localhost')
+                    port = int(os.getenv('DB_PORT', 3306))
+                    database = os.getenv('DB_NAME', 'healthcare')
             else:
                 # Use default values
-                user = 'root'
-                password = '9850337042'
-                host = 'localhost'
-                port = 3306
-                database = 'healthcare'
+                user = os.getenv('DB_USER', 'root')
+                password = os.getenv('DB_PASSWORD', '')
+                host = os.getenv('DB_HOST', 'localhost')
+                port = int(os.getenv('DB_PORT', 3306))
+                database = os.getenv('DB_NAME', 'healthcare')
             
             conn = mysql.connector.connect(
                 host=host,

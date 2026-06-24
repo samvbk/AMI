@@ -51,4 +51,4 @@ if __name__ == "__main__":
     print("3. Start the server: python app.py")
     print("\n💡 Don't forget to:")
     print("   - Get a Gemini API key from: https://makersuite.google.com/app/apikey")
-    print("   - Add it to config.py or set GEMINI_API_KEY environment variable")
+    print("   - Set GEMINI_API_KEY environment variable in your .env file")

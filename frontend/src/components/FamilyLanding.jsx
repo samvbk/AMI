@@ -2,15 +2,18 @@
 import { useState } from 'react';
 import { Users, UserPlus, Home, ArrowRight } from 'lucide-react';
 import CameraComponent from './Camera';
-import { registerMember, recognizeFace } from '../services/api';
+import { registerMember, recognizeFace, loginOverride } from '../services/api';
 
 export default function FamilyLanding({ onLogin, onRegisterFamily }) {
   const [mode, setMode] = useState(null); // 'existing', 'new-family', 'new-member'
   const [showCamera, setShowCamera] = useState(false);
   const [message, setMessage] = useState('');
+  const [topMatches, setTopMatches] = useState([]);
 
   const handleExistingMember = () => {
     setMode('existing');
+    setTopMatches([]);
+    setMessage('');
     setShowCamera(true);
   };
 
@@ -27,14 +30,30 @@ export default function FamilyLanding({ onLogin, onRegisterFamily }) {
   const handleCameraCapture = async (imageBase64) => {
     if (mode === 'existing') {
       // Face recognition for existing member
+      setMessage('Analyzing face...');
       const result = await recognizeFace(imageBase64);
       if (result.success && result.recognized) {
         onLogin(result.member);
       } else {
-        setMessage('Member not recognized. Please register first.');
+        if (result.top_matches && result.top_matches.length > 0) {
+          setTopMatches(result.top_matches);
+          setMessage('Face not perfectly matched. Are you one of these members?');
+        } else {
+          setMessage('Member not recognized. Please register first.');
+        }
       }
     }
     setShowCamera(false);
+  };
+
+  const handleManualLogin = async (memberId) => {
+    setMessage('Logging in...');
+    const result = await loginOverride(memberId);
+    if (result.success && result.member) {
+      onLogin(result.member);
+    } else {
+      setMessage(result.message || 'Login override failed.');
+    }
   };
 
   return (
@@ -116,8 +135,30 @@ export default function FamilyLanding({ onLogin, onRegisterFamily }) {
 
         {/* Message */}
         {message && (
-          <div className="max-w-2xl mx-auto p-4 bg-white/10 backdrop-blur-sm rounded-xl border border-white/20">
+          <div className="max-w-2xl mx-auto p-4 bg-white/10 backdrop-blur-sm rounded-xl border border-white/20 mb-6">
             <p className="text-white text-center">{message}</p>
+          </div>
+        )}
+
+        {/* Top Matches (Manual Selection Override) */}
+        {topMatches.length > 0 && (
+          <div className="max-w-2xl mx-auto space-y-4">
+            {topMatches.map((match) => (
+              <button
+                key={match.id}
+                onClick={() => handleManualLogin(match.id)}
+                className="w-full flex items-center justify-between p-4 bg-blue-900/40 hover:bg-blue-800/60 backdrop-blur-md rounded-xl border border-blue-400/30 transition-all"
+              >
+                <div className="flex flex-col text-left">
+                  <span className="text-white font-bold text-xl">{match.name}</span>
+                  <span className="text-blue-200">Family: {match.family_name}</span>
+                </div>
+                <div className="flex flex-col items-end">
+                  <span className="text-sm text-blue-300">Match Confidence</span>
+                  <span className="text-white font-medium">{match.confidence}%</span>
+                </div>
+              </button>
+            ))}
           </div>
         )}
 

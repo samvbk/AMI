@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Webcam from 'react-webcam';
 import { Camera, X, Check, User } from 'lucide-react';
+import { checkFaceQuality } from '../services/api';
 
 export default function CameraComponent({ onCapture, onClose, mode = 'recognize' }) {
   const webcamRef = useRef(null);
@@ -8,6 +9,7 @@ export default function CameraComponent({ onCapture, onClose, mode = 'recognize'
   const [capturedImage, setCapturedImage] = useState(null);
   const [facingMode, setFacingMode] = useState('user');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [quality, setQuality] = useState({ quality: 'checking', message: 'Checking face quality...' });
 
   const videoConstraints = {
     width: 640,
@@ -16,6 +18,10 @@ export default function CameraComponent({ onCapture, onClose, mode = 'recognize'
   };
 
   const capture = () => {
+    if (mode !== 'recognize' && quality.quality !== 'good') {
+      alert(quality.message || 'Please improve face quality before capture.');
+      return;
+    }
     if (webcamRef.current) {
       const imageSrc = webcamRef.current.getScreenshot();
       setCapturedImage(imageSrc);
@@ -51,6 +57,36 @@ export default function CameraComponent({ onCapture, onClose, mode = 'recognize'
     return () => setIsCameraOn(false);
   }, []);
 
+  useEffect(() => {
+    if (!isCameraOn || capturedImage) return undefined;
+
+    let cancelled = false;
+    const runCheck = async () => {
+      const imageSrc = webcamRef.current?.getScreenshot();
+      if (!imageSrc || cancelled) return;
+      const result = await checkFaceQuality(imageSrc);
+      if (!cancelled) setQuality(result);
+    };
+
+    runCheck();
+    const timer = setInterval(runCheck, 2000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [isCameraOn, capturedImage, facingMode]);
+
+  const qualityStyles = {
+    good: 'bg-green-100 text-green-800 border-green-200',
+    too_dark: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+    no_face: 'bg-red-100 text-red-800 border-red-200',
+    multiple_faces: 'bg-red-100 text-red-800 border-red-200',
+    blurry: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+    too_far: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+    checking: 'bg-blue-100 text-blue-800 border-blue-200',
+    unavailable: 'bg-gray-100 text-gray-800 border-gray-200',
+  };
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-gradient-to-br from-white to-purple-50 rounded-2xl p-6 max-w-2xl w-full shadow-2xl">
@@ -69,13 +105,18 @@ export default function CameraComponent({ onCapture, onClose, mode = 'recognize'
 
         <div className="mb-6 relative">
           {isCameraOn && !capturedImage && (
-            <Webcam
-              audio={false}
-              ref={webcamRef}
-              screenshotFormat="image/jpeg"
-              videoConstraints={videoConstraints}
-              className="rounded-xl w-full h-auto border-4 border-purple-200"
-            />
+            <>
+              <Webcam
+                audio={false}
+                ref={webcamRef}
+                screenshotFormat="image/jpeg"
+                videoConstraints={videoConstraints}
+                className="rounded-xl w-full h-auto border-4 border-purple-200"
+              />
+              <div className={`absolute top-4 left-4 border px-4 py-2 rounded-full text-sm font-bold ${qualityStyles[quality.quality] || qualityStyles.unavailable}`}>
+                {quality.quality === 'good' ? 'Good' : quality.message || 'Checking face quality...'}
+              </div>
+            </>
           )}
 
           {capturedImage && (
@@ -100,6 +141,7 @@ export default function CameraComponent({ onCapture, onClose, mode = 'recognize'
             <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex gap-4">
               <button
                 onClick={capture}
+                disabled={mode !== 'recognize' && quality.quality !== 'good'}
                 className="bg-gradient-to-r from-purple-600 to-pink-600 text-white p-4 rounded-full shadow-lg hover:shadow-xl transition-all hover:scale-105"
               >
                 <Camera className="w-8 h-8" />

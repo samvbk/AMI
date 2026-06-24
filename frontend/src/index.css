@@ -18,3 +18,13 @@
     @apply absolute inset-0 rounded-2xl p-[2px] bg-gradient-to-r from-purple-500 via-pink-500 to-orange-500 -z-10;
   }
 }
+
+@layer utilities {
+  .high-contrast {
+    filter: contrast(1.25) saturate(1.1);
+  }
+  
+  .large-text {
+    font-size: 110%;
+  }
+}

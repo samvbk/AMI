@@ -12,6 +12,7 @@ export default function ChatInterface({ member }) {
   const [loading, setLoading] = useState(false);
   const [currentAudio, setCurrentAudio] = useState(null);
   const messagesEndRef = useRef(null);
+  const lastSendAtRef = useRef(0);
 
   useEffect(() => {
     // Load initial message
@@ -34,6 +35,9 @@ export default function ChatInterface({ member }) {
 
   const handleSend = async () => {
     if (!input.trim() || loading || !member) return;
+    const now = Date.now();
+    if (now - lastSendAtRef.current < 1000) return;
+    lastSendAtRef.current = now;
 
     const userMessage = {
       id: messages.length + 1,

@@ -1,80 +1,19 @@
-
-
-
-
+import { generateTTS } from './api';
 
 class VoiceService {
   constructor() {
     this.isListening  = false;
     this.isSpeaking   = false;
+    this.isPaused     = false; // Sleep Mode Support
     this.recognition  = null;
     this.onUserSpeech = null;
     this.currentAudio = null;
     this.cachedVoice  = null;
 
-    // Gemini key rotation — accepts a single key or an array of up to 3 keys.
-    // When one key hits 429 (rate limit), it automatically switches to the next.
-    this.geminiKeys       = [];   // array of keys
-    this.geminiKeyIndex   = 0;    // which key we're currently using
-    this.keyExhaustedAt   = {};   // tracks when each key hit 429 (to retry after cooldown)
-
     // Language: 'en-IN' or 'hi-IN'
     this.language = 'en-IN';
 
     this.init();
-  }
-
-  // ─── KEY SETTER — accepts single key OR array of keys ────────────────────────
-  // Single key:  voiceService.setGeminiApiKey('AIza...')
-  // Multi key:   voiceService.setGeminiApiKey(['AIza...', 'AIza...', 'AIza...'])
-  setGeminiApiKey(keyOrArray) {
-    if (Array.isArray(keyOrArray)) {
-      this.geminiKeys = keyOrArray.filter(Boolean); // remove null/undefined
-    } else if (keyOrArray) {
-      this.geminiKeys = [keyOrArray];
-    } else {
-      this.geminiKeys = [];
-    }
-    this.geminiKeyIndex = 0;
-    this.keyExhaustedAt = {};
-
-    if (this.geminiKeys.length > 0) {
-      console.log(`🔑 [VoiceService] ${this.geminiKeys.length} Gemini key(s) loaded. Ready to rotate.`);
-    } else {
-      console.warn('⚠️ [VoiceService] No Gemini keys — will use browser TTS only');
-    }
-  }
-
-  // Returns current active key, or null if none available
-  get geminiApiKey() {
-    return this.geminiKeys.length > 0 ? this.geminiKeys[this.geminiKeyIndex] : null;
-  }
-
-  // Rotate to the next available key that isn't in cooldown
-  // Returns true if a usable key was found, false if all are exhausted
-  rotateToNextKey(exhaustedKeyIndex) {
-    const now        = Date.now();
-    const cooldownMs = 60 * 1000; // 1 minute cooldown before retrying an exhausted key
-
-    // Mark this key as exhausted
-    this.keyExhaustedAt[exhaustedKeyIndex] = now;
-    console.warn(`⚠️ [VoiceService] Key ${exhaustedKeyIndex + 1} hit rate limit. Trying next key...`);
-
-    // Find the next key that isn't in cooldown
-    for (let i = 1; i <= this.geminiKeys.length; i++) {
-      const nextIndex     = (exhaustedKeyIndex + i) % this.geminiKeys.length;
-      const exhaustedTime = this.keyExhaustedAt[nextIndex];
-
-      // Key is usable if it was never exhausted, or cooldown has passed
-      if (!exhaustedTime || (now - exhaustedTime) > cooldownMs) {
-        this.geminiKeyIndex = nextIndex;
-        console.log(`✅ [VoiceService] Switched to Gemini key ${nextIndex + 1}`);
-        return true;
-      }
-    }
-
-    console.error('❌ [VoiceService] All Gemini keys exhausted. Falling back to browser TTS.');
-    return false;
   }
 
   // ─── LANGUAGE SWITCHING ──────────────────────────────────────────────────────
@@ -116,7 +55,8 @@ class VoiceService {
       };
 
       this.recognition.onresult = (event) => {
-        const transcript = event.results[0][0].transcript.trim();
+        const current = event.resultIndex;
+        const transcript = event.results[current][0].transcript.trim();
         console.log('🗣️ [VoiceService] User said:', transcript);
         if (transcript && this.onUserSpeech) {
           this.onUserSpeech(transcript);
@@ -342,7 +282,7 @@ class VoiceService {
   async speak(text, onEnd = null) {
     if (!text) { if (onEnd) onEnd(); return; }
 
-    console.log(`[VoiceService] speak() — ${this.geminiKeys.length} Gemini key(s) available. Active: key ${this.geminiKeyIndex + 1}`);
+    console.log('[VoiceService] speak() called');
     console.log('[VoiceService] Text:', text.substring(0, 80));
 
     await this.stopSpeaking();
@@ -360,13 +300,9 @@ class VoiceService {
     const cleaned = this.isHindi() ? text.trim() : this.preprocessTextForSpeech(text);
 
     try {
-      if (this.geminiKeys.length > 0) {
-        const success = await this.speakWithGemini(cleaned, onEnd);
-        if (success) return;
-        console.warn('[VoiceService] All Gemini keys failed — falling back to browser TTS');
-      } else {
-        console.warn('[VoiceService] No Gemini keys — using browser TTS');
-      }
+      const success = await this.speakWithGemini(cleaned, onEnd);
+      if (success) return;
+      console.warn('[VoiceService] Backend TTS failed — falling back to browser TTS');
       this.speakWithBrowser(cleaned, onEnd);
     } catch (error) {
       console.error('[VoiceService] speak() error:', error);
@@ -382,71 +318,23 @@ class VoiceService {
   // Gemini returns raw PCM (audio/L16) — converted to WAV before playback.
   // On 429: automatically rotates to the next key and retries once.
   // On all keys exhausted: returns false → browser TTS fallback kicks in.
-  async speakWithGemini(text, onEnd = null, retryCount = 0) {
-    if (this.geminiKeys.length === 0) return false;
+  async speakWithGemini(text, onEnd = null) {
+    const voiceName = 'Kore';
+    const langCode = this.language;
 
-    const currentKeyIndex = this.geminiKeyIndex;
-    const currentKey      = this.geminiKeys[currentKeyIndex];
-    const voiceName       = 'Kore';
-    const langCode        = this.language;
-    const url             = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${currentKey}`;
-
-    console.log(`[VoiceService] Gemini TTS — key ${currentKeyIndex + 1}/${this.geminiKeys.length}, voice: ${voiceName}, lang: ${langCode}`);
+    console.log(`[VoiceService] Gemini TTS (via Backend) — voice: ${voiceName}, lang: ${langCode}`);
 
     try {
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text }] }],
-          generationConfig: {
-            temperature: 0.3,
-            maxOutputTokens: 8192,
-            responseModalities: ['AUDIO'],
-            speechConfig: {
-              voiceConfig: {
-                prebuiltVoiceConfig: { voiceName }
-              },
-              languageCode: langCode
-            }
-          }
-        })
-      });
-
-      // ── 429: This key is rate-limited — rotate to next key and retry ──────────
-      if (response.status === 429) {
-        const canRetry = this.rotateToNextKey(currentKeyIndex);
-        if (canRetry && retryCount < this.geminiKeys.length) {
-          console.log(`[VoiceService] Retrying with key ${this.geminiKeyIndex + 1}...`);
-          return this.speakWithGemini(text, onEnd, retryCount + 1);
-        }
-        console.error('[VoiceService] All keys rate-limited. Giving up.');
+      const data = await generateTTS(text, langCode, voiceName);
+      
+      if (!data || !data.success || !data.audioData) {
+        console.warn('[VoiceService] Backend TTS failed or returned no audio');
         return false;
       }
 
-      if (!response.ok) {
-        const err = await response.text();
-        console.error('[VoiceService] Gemini TTS HTTP', response.status, ':', err);
-        return false;
-      }
 
-      const data  = await response.json();
-      const parts = data?.candidates?.[0]?.content?.parts || [];
-      let audioData = null;
-      let mimeType  = 'audio/wav';
-
-      for (const part of parts) {
-        if (part.inlineData?.data) {
-          audioData = part.inlineData.data;
-          mimeType  = part.inlineData.mimeType || 'audio/wav';
-          break;
-        }
-      }
-
-      if (!audioData) {
-        console.warn('[VoiceService] No audio in Gemini response');
-        return false;
-      }
+      const mimeType = data.mimeType || 'audio/mp3';
+      const audioData = data.audioData;
 
       // ── KEY FIX: Convert raw PCM (audio/L16) → WAV so browser can play it ────
       let audioBlob;
@@ -464,7 +352,7 @@ class VoiceService {
 
       return new Promise((resolve) => {
         this.currentAudio.onplay = () =>
-          console.log(`▶️ [VoiceService] Gemini playing — ${voiceName} (key ${currentKeyIndex + 1})`);
+          console.log(`▶️ [VoiceService] Gemini playing — ${voiceName}`);
 
         this.currentAudio.onended = () => {
           console.log('✅ [VoiceService] Gemini audio finished');
@@ -559,8 +447,8 @@ class VoiceService {
       const sentence  = sentences[index++];
       const utterance = new SpeechSynthesisUtterance(sentence);
       utterance.lang   = this.language;
-      utterance.rate   = 0.78;
-      utterance.pitch  = 1.15;
+      utterance.rate   = 0.88;   // slightly faster feels more natural
+      utterance.pitch  = 1.1;    // gentle feminine pitch, not exaggerated
       utterance.volume = 1.0;
 
       if (!this.cachedVoice) this.cachedVoice = this.pickFemaleVoice();
@@ -637,9 +525,21 @@ class VoiceService {
   }
 
   restartListening() {
-    if (this.isSpeaking) return;
+    if (this.isSpeaking || this.isPaused) return;
     this.stopListening();
     setTimeout(() => this.startRecognition(), 1000);
+  }
+
+  pauseListening() {
+    console.log('🔇 [VoiceService] Paused listening (Sleep Mode)');
+    this.isPaused = true;
+    this.stopListening();
+  }
+
+  resumeListening() {
+    console.log('🔊 [VoiceService] Resumed listening');
+    this.isPaused = false;
+    this.restartListening();
   }
 
   stopListening() {
@@ -653,13 +553,17 @@ class VoiceService {
     if (this.currentAudio) {
       this.currentAudio.pause();
       this.currentAudio.currentTime = 0;
+      // Cleanup the blob URL to prevent memory leaks
+      if (this.currentAudio.src && this.currentAudio.src.startsWith('blob:')) {
+        URL.revokeObjectURL(this.currentAudio.src);
+      }
       this.currentAudio = null;
     }
     window.speechSynthesis?.cancel();
     this.isSpeaking = false;
   }
 
-  isSpeechAvailable()           { return this.geminiKeys.length > 0 || !!window.speechSynthesis; }
+  isSpeechAvailable()           { return true; } // Backend provides TTS
   isVoiceRecognitionAvailable() { return !!this.recognition; }
 }
 

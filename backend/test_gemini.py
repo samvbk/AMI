@@ -10,7 +10,6 @@ if not config.GEMINI_API_KEY:
     print("❌ No API key found")
     exit(1)
 
-print(f"🔑 Key: {config.GEMINI_API_KEY[:12]}...")
 
 try:
     genai.configure(api_key=config.GEMINI_API_KEY)

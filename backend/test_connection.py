@@ -2,6 +2,10 @@
 import mysql.connector
 import requests
 import time
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 print("🔍 Testing Family Healthcare Assistant Setup")
 print("=" * 50)
@@ -10,10 +14,11 @@ print("=" * 50)
 print("\n1. Testing MySQL connection...")
 try:
     conn = mysql.connector.connect(
-        host="localhost",
-        user="root",
-        password="9850337042",
-        database="healthcare",
+        host=os.getenv("DB_HOST", "localhost"),
+        user=os.getenv("DB_USER", "root"),
+        password=os.getenv("DB_PASSWORD", ""),
+        database=os.getenv("DB_NAME", "healthcare"),
+        port=int(os.getenv("DB_PORT", 3306)),
         connection_timeout=5
     )
     cursor = conn.cursor()
@@ -25,7 +30,7 @@ try:
 except Exception as e:
     print(f"❌ MySQL connection failed: {e}")
     print("   Run: mysql -u root -p")
-    print("   Enter password: 9850337042")
+    print("   Enter the password from your DB_PASSWORD environment variable")
     print("   Then run: CREATE DATABASE healthcare;")
 
 # Test 2: Backend Server

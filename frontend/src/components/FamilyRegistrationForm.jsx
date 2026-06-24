@@ -1,10 +1,27 @@
 // frontend/src/components/FamilyRegistrationForm.jsx
-import { useState } from 'react';
-import { UserPlus, Trash2, Save } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { UserPlus, Trash2, Save, Users } from 'lucide-react';
 
 export default function FamilyRegistrationForm({ onSubmit, onCancel }) {
   const [familyName, setFamilyName] = useState('');
   const [members, setMembers] = useState([{ name: '', role: '', age: '' }]);
+  const [existingFamilies, setExistingFamilies] = useState([]);
+
+  // Fetch existing families for the datalist
+  useEffect(() => {
+    const fetchFamilies = async () => {
+      try {
+        const response = await fetch('http://localhost:8000/families');
+        const data = await response.json();
+        if (data.success && data.families) {
+          setExistingFamilies(data.families);
+        }
+      } catch (error) {
+        console.error('Failed to fetch families:', error);
+      }
+    };
+    fetchFamilies();
+  }, []);
 
   const addMember = () => {
     setMembers([...members, { name: '', role: '', age: '' }]);
@@ -42,88 +59,179 @@ export default function FamilyRegistrationForm({ onSubmit, onCancel }) {
     });
   };
 
+  const inputStyle = {
+    width: '100%',
+    padding: '12px 16px',
+    background: '#FFFFFF',
+    border: '1.5px solid #D6E2F0',
+    borderRadius: 12,
+    color: '#2C5F9E',
+    fontSize: '0.95rem',
+    fontFamily: "'Nunito', sans-serif",
+    outline: 'none',
+    transition: 'border-color 0.2s, box-shadow 0.2s',
+  };
+
+  const labelStyle = {
+    display: 'block',
+    color: '#4A86CF',
+    fontWeight: 700,
+    fontSize: '0.85rem',
+    marginBottom: 6,
+    letterSpacing: '0.02em',
+  };
+
   return (
-    <div className="max-w-3xl mx-auto p-8 bg-white/10 backdrop-blur-sm rounded-3xl border border-white/20">
-      <h2 className="text-2xl font-bold text-white mb-6">Register New Family</h2>
-      
-      <div className="space-y-6">
+    <div style={{
+      maxWidth: 820,
+      margin: '0 auto',
+      padding: 36,
+      background: '#FFFFFF',
+      borderRadius: 24,
+      border: '1.5px solid #D6E2F0',
+      boxShadow: '0 8px 44px rgba(74,134,207,0.11)',
+    }}>
+      {/* Header */}
+      <div style={{ textAlign: 'center', marginBottom: 32 }}>
+        <div style={{
+          width: 64, height: 64, borderRadius: 16,
+          background: 'linear-gradient(135deg, #4A86CF, #82ACE0)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          margin: '0 auto 16px',
+        }}>
+          <Users style={{ width: 30, height: 30, color: '#FFFFFF' }} />
+        </div>
+        <h2 style={{ color: '#2C5F9E', fontWeight: 800, fontSize: '1.6rem', margin: 0 }}>
+          Register New Family
+        </h2>
+        <p style={{ color: '#7A9DBF', fontSize: '0.95rem', marginTop: 8 }}>
+          Set up your family profile to get started with A.M.I.
+        </p>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
         {/* Family Name */}
         <div>
-          <label className="block text-gray-300 mb-2">Family Name</label>
+          <label style={labelStyle}>Family Name</label>
           <input
             type="text"
+            list="existing-families"
             value={familyName}
             onChange={(e) => setFamilyName(e.target.value)}
-            className="w-full p-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:border-blue-400"
-            placeholder="Enter your family name (e.g., Sharma Family)"
+            style={inputStyle}
+            placeholder="Enter family name or select existing (e.g., Sharma)"
+            onFocus={(e) => { e.target.style.borderColor = '#4A86CF'; e.target.style.boxShadow = '0 0 0 3px rgba(74,134,207,0.15)'; }}
+            onBlur={(e) => { e.target.style.borderColor = '#D6E2F0'; e.target.style.boxShadow = 'none'; }}
           />
+          <datalist id="existing-families">
+            {existingFamilies.map((f) => (
+              <option key={f.id} value={f.family_name} />
+            ))}
+          </datalist>
+          {existingFamilies.length > 0 && (
+            <p style={{ color: '#82ACE0', fontSize: '0.78rem', marginTop: 4 }}>
+              💡 Existing families: {existingFamilies.map(f => f.family_name).join(', ')}
+            </p>
+          )}
         </div>
 
         {/* Members */}
         <div>
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-bold text-white">Family Members</h3>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+            <h3 style={{ color: '#2C5F9E', fontWeight: 800, fontSize: '1.1rem', margin: 0 }}>Family Members</h3>
             <button
               onClick={addMember}
-              className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg flex items-center gap-2"
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '8px 16px', borderRadius: 10,
+                background: 'linear-gradient(135deg, #4A86CF, #82ACE0)',
+                color: '#FFFFFF', fontWeight: 700, fontSize: '0.85rem',
+                border: 'none', cursor: 'pointer',
+                fontFamily: "'Nunito', sans-serif",
+                transition: 'transform 0.15s, box-shadow 0.15s',
+              }}
+              onMouseEnter={(e) => { e.target.style.transform = 'translateY(-1px)'; e.target.style.boxShadow = '0 4px 12px rgba(74,134,207,0.3)'; }}
+              onMouseLeave={(e) => { e.target.style.transform = 'translateY(0)'; e.target.style.boxShadow = 'none'; }}
             >
-              <UserPlus className="w-4 h-4" />
+              <UserPlus style={{ width: 16, height: 16 }} />
               Add Member
             </button>
           </div>
 
-          <div className="space-y-4">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {members.map((member, index) => (
-              <div key={index} className="p-4 bg-white/5 rounded-xl border border-white/10">
-                <div className="flex items-center justify-between mb-4">
-                  <h4 className="text-white font-medium">Member {index + 1}</h4>
+              <div key={index} style={{
+                padding: 20, borderRadius: 16,
+                background: '#F4F6F8',
+                border: '1.5px solid #D6E2F0',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                  <h4 style={{ color: '#4A86CF', fontWeight: 700, fontSize: '0.9rem', margin: 0 }}>
+                    Member {index + 1}
+                  </h4>
                   {members.length > 1 && (
                     <button
                       onClick={() => removeMember(index)}
-                      className="p-1 text-red-400 hover:text-red-300"
+                      style={{
+                        background: 'none', border: 'none', cursor: 'pointer',
+                        color: '#E8836A', padding: 4, borderRadius: 6,
+                        transition: 'background 0.15s',
+                      }}
+                      onMouseEnter={(e) => e.target.style.background = 'rgba(232,131,106,0.1)'}
+                      onMouseLeave={(e) => e.target.style.background = 'none'}
                     >
-                      <Trash2 className="w-4 h-4" />
+                      <Trash2 style={{ width: 16, height: 16 }} />
                     </button>
                   )}
                 </div>
-                
-                <div className="grid md:grid-cols-3 gap-4">
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12 }}>
                   <div>
-                    <label className="block text-gray-300 text-sm mb-1">Name</label>
+                    <label style={labelStyle}>Name</label>
                     <input
                       type="text"
                       value={member.name}
                       onChange={(e) => updateMember(index, 'name', e.target.value)}
-                      className="w-full p-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-blue-400"
+                      style={inputStyle}
                       placeholder="Full name"
+                      onFocus={(e) => { e.target.style.borderColor = '#4A86CF'; e.target.style.boxShadow = '0 0 0 3px rgba(74,134,207,0.15)'; }}
+                      onBlur={(e) => { e.target.style.borderColor = '#D6E2F0'; e.target.style.boxShadow = 'none'; }}
                     />
                   </div>
-                  
+
                   <div>
-                    <label className="block text-gray-300 text-sm mb-1">Role</label>
+                    <label style={labelStyle}>Role</label>
                     <select
                       value={member.role}
                       onChange={(e) => updateMember(index, 'role', e.target.value)}
-                      className="w-full p-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:border-blue-400"
+                      style={{ ...inputStyle, appearance: 'auto' }}
+                      onFocus={(e) => { e.target.style.borderColor = '#4A86CF'; e.target.style.boxShadow = '0 0 0 3px rgba(74,134,207,0.15)'; }}
+                      onBlur={(e) => { e.target.style.borderColor = '#D6E2F0'; e.target.style.boxShadow = 'none'; }}
                     >
                       <option value="">Select Role</option>
                       <option value="Father">Father</option>
                       <option value="Mother">Mother</option>
                       <option value="Son">Son</option>
                       <option value="Daughter">Daughter</option>
-                      <option value="Grandparent">Grandparent</option>
+                      <option value="Grandfather">Grandfather</option>
+                      <option value="Grandmother">Grandmother</option>
+                      <option value="Guardian">Guardian</option>
                       <option value="Other">Other</option>
                     </select>
                   </div>
-                  
+
                   <div>
-                    <label className="block text-gray-300 text-sm mb-1">Age</label>
+                    <label style={labelStyle}>Age</label>
                     <input
                       type="number"
                       value={member.age}
                       onChange={(e) => updateMember(index, 'age', e.target.value)}
-                      className="w-full p-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-blue-400"
+                      style={inputStyle}
                       placeholder="Age"
+                      min="0"
+                      max="120"
+                      onFocus={(e) => { e.target.style.borderColor = '#4A86CF'; e.target.style.boxShadow = '0 0 0 3px rgba(74,134,207,0.15)'; }}
+                      onBlur={(e) => { e.target.style.borderColor = '#D6E2F0'; e.target.style.boxShadow = 'none'; }}
                     />
                   </div>
                 </div>
@@ -133,18 +241,40 @@ export default function FamilyRegistrationForm({ onSubmit, onCancel }) {
         </div>
 
         {/* Buttons */}
-        <div className="flex justify-end gap-4 pt-6 border-t border-white/20">
+        <div style={{
+          display: 'flex', justifyContent: 'flex-end', gap: 12,
+          paddingTop: 24, borderTop: '1.5px solid #D6E2F0',
+        }}>
           <button
             onClick={onCancel}
-            className="px-6 py-3 border border-white/30 text-white rounded-xl hover:bg-white/10"
+            style={{
+              padding: '12px 24px', borderRadius: 12,
+              border: '1.5px solid #D6E2F0', background: '#FFFFFF',
+              color: '#4A86CF', fontWeight: 700, fontSize: '0.9rem',
+              cursor: 'pointer', fontFamily: "'Nunito', sans-serif",
+              transition: 'background 0.15s',
+            }}
+            onMouseEnter={(e) => e.target.style.background = '#F4F6F8'}
+            onMouseLeave={(e) => e.target.style.background = '#FFFFFF'}
           >
             Cancel
           </button>
           <button
             onClick={handleSubmit}
-            className="px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl hover:from-green-600 hover:to-emerald-700 flex items-center gap-2"
+            style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              padding: '12px 28px', borderRadius: 12,
+              background: 'linear-gradient(135deg, #3AAFA9, #2D8F8A)',
+              color: '#FFFFFF', fontWeight: 700, fontSize: '0.9rem',
+              border: 'none', cursor: 'pointer',
+              fontFamily: "'Nunito', sans-serif",
+              boxShadow: '0 4px 16px rgba(58,175,169,0.3)',
+              transition: 'transform 0.15s, box-shadow 0.15s',
+            }}
+            onMouseEnter={(e) => { e.target.style.transform = 'translateY(-2px)'; e.target.style.boxShadow = '0 6px 20px rgba(58,175,169,0.4)'; }}
+            onMouseLeave={(e) => { e.target.style.transform = 'translateY(0)'; e.target.style.boxShadow = '0 4px 16px rgba(58,175,169,0.3)'; }}
           >
-            <Save className="w-5 h-5" />
+            <Save style={{ width: 18, height: 18 }} />
             Register Family
           </button>
         </div>

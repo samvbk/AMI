@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { User, Users, Calendar, Stethoscope } from 'lucide-react';
 
 export default function RegisterForm({ onSubmit, loading }) {
@@ -8,6 +8,23 @@ export default function RegisterForm({ onSubmit, loading }) {
     role: '',
     age: ''
   });
+  const [existingFamilies, setExistingFamilies] = useState([]);
+
+  // Fetch existing families for the datalist
+  useEffect(() => {
+    const fetchFamilies = async () => {
+      try {
+        const response = await fetch('http://localhost:8000/families');
+        const data = await response.json();
+        if (data.success && data.families) {
+          setExistingFamilies(data.families);
+        }
+      } catch (error) {
+        console.error('Failed to fetch families:', error);
+      }
+    };
+    fetchFamilies();
+  }, []);
 
   const roles = [
     'Father', 'Mother', 'Son', 'Daughter', 
@@ -47,12 +64,23 @@ export default function RegisterForm({ onSubmit, loading }) {
           <input
             type="text"
             name="family_name"
+            list="register-families"
             value={formData.family_name}
             onChange={handleChange}
-            placeholder="Enter your family name"
+            placeholder="Enter family name or select existing"
             className="w-full p-4 border-2 border-purple-100 rounded-xl focus:border-purple-500 focus:ring-2 focus:ring-purple-200 focus:outline-none transition-all bg-white"
             required
           />
+          <datalist id="register-families">
+            {existingFamilies.map((f) => (
+              <option key={f.id} value={f.family_name} />
+            ))}
+          </datalist>
+          {existingFamilies.length > 0 && (
+            <p className="text-xs text-purple-400 mt-1">
+              💡 Existing families: {existingFamilies.map(f => f.family_name).join(', ')}
+            </p>
+          )}
         </div>
 
         <div>

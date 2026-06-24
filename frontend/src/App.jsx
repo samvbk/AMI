@@ -6,7 +6,7 @@ import RegisterForm from './components/RegisterForm';
 import AlwaysOnAssistant from './components/AlwaysOnAssistant';
 import VideoCharacter from './components/VideoCharacter';
 import FamilyRegistrationForm from './components/FamilyRegistrationForm';
-import { recognizeFace, registerMember } from './services/api';
+import { recognizeFace, registerMember, loginOverride } from './services/api';
 import './App.css';
 
 /* ─── Global styles + keyframes injected once ─── */
@@ -96,12 +96,23 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [familyData, setFamilyData] = useState(null);
+  const [topMatches, setTopMatches] = useState([]);
 
-  const handleExistingMember = () => { setMode('recognize'); setShowCamera(true); setMessage(''); };
+  useEffect(() => {
+    const handleUnauthorized = () => {
+      setMember(null);
+      setMode('landing');
+      setMessage('Session expired. Please log in again.');
+    };
+    window.addEventListener('ami_unauthorized', handleUnauthorized);
+    return () => window.removeEventListener('ami_unauthorized', handleUnauthorized);
+  }, []);
+
+  const handleExistingMember = () => { setMode('recognize'); setShowCamera(true); setMessage(''); setTopMatches([]); };
   const handleNewFamily      = () => setMode('register-family');
 
   const handleFaceRecognition = async (imageBase64) => {
-    setLoading(true); setMessage('');
+    setLoading(true); setMessage(''); setTopMatches([]);
     try {
       const result = await recognizeFace(imageBase64);
       if (result.success && result.recognized) {
@@ -109,7 +120,11 @@ function App() {
         setMessage(`Welcome back, ${result.member.name}! Assistant is activating...`);
       } else {
         setMessage(result.message || 'Face not recognized. Please register.');
-        if (mode === 'recognize') setMode('register-member');
+        if (result.top_matches && result.top_matches.length > 0) {
+          setTopMatches(result.top_matches);
+        } else {
+          if (mode === 'recognize') setMode('register-member');
+        }
       }
     } catch(e) { setMessage('❌ Error recognizing face. Please try again.'); }
     finally { setLoading(false); setShowCamera(false); }
@@ -145,8 +160,25 @@ function App() {
     finally { setLoading(false); }
   };
 
-  const handleLogout       = () => { setMember(null); setMode('landing'); setMessage(''); setRegistrationData(null); setFamilyData(null); };
-  const handleBackToLanding = () => { setMode('landing'); setMessage(''); setRegistrationData(null); };
+  const handleLogout       = () => { setMember(null); setMode('landing'); setMessage(''); setRegistrationData(null); setFamilyData(null); setTopMatches([]); };
+  const handleBackToLanding = () => { setMode('landing'); setMessage(''); setRegistrationData(null); setTopMatches([]); };
+
+  const handleManualLogin = async (memberId) => {
+    setLoading(true);
+    try {
+      const result = await loginOverride(memberId);
+      if (result.success) {
+        setMember(result.member);
+        setMode('assistant');
+      } else {
+        setMessage('❌ Login bypass failed.');
+      }
+    } catch(e) {
+      setMessage('❌ Error: ' + e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   if (mode === 'assistant' && member) return <AlwaysOnAssistant member={member} onLogout={handleLogout} />;
 
@@ -274,8 +306,39 @@ function App() {
               </div>
 
               {message && (
-                <div style={{ maxWidth:480, margin:'0 auto', padding:'14px 22px', borderRadius:14, background:'#FFFFFF', border:'1px solid #D6E2F0', color:'#4A86CF', fontWeight:700, boxShadow:'0 2px 14px rgba(74,134,207,0.1)', fontSize:'0.92rem' }}>
+                <div style={{ maxWidth:480, margin:'0 auto', padding:'14px 22px', borderRadius:14, background:'#FFFFFF', border:'1px solid #D6E2F0', color:'#4A86CF', fontWeight:700, boxShadow:'0 2px 14px rgba(74,134,207,0.1)', fontSize:'0.92rem', marginBottom: '20px' }}>
                   {message}
+                </div>
+              )}
+
+              {topMatches && topMatches.length > 0 && (
+                <div style={{ maxWidth:480, margin:'0 auto 20px', padding:'20px', borderRadius:14, background:'#FFFFFF', border:'1px solid #D6E2F0', boxShadow:'0 2px 14px rgba(74,134,207,0.1)' }}>
+                  <h3 style={{ color:'#2C5F9E', fontWeight:800, fontSize:'1.05rem', marginBottom:12 }}>Did you mean one of these?</h3>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {topMatches.map((match) => (
+                      <button
+                        key={match.member_id}
+                        onClick={() => handleManualLogin(match.member_id)}
+                        className="card-hover"
+                        style={{
+                          background: '#EBF3FC',
+                          border: '1px solid #D6E2F0',
+                          borderRadius: 12,
+                          padding: '12px 16px',
+                          cursor: 'pointer',
+                          textAlign: 'left',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          color: '#2C5F9E',
+                          fontWeight: 700
+                        }}
+                      >
+                        <span>{match.name} {match.family_name ? `(${match.family_name})` : ''}</span>
+                        <span style={{ fontSize: '0.8rem', color: '#7A9DBF' }}>{Math.round(match.confidence * 100)}% match</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
 
@@ -386,7 +449,7 @@ function App() {
                 <div>
                   <h5 style={{ color:'#D6E2F0', fontWeight:800, fontSize:'0.75rem', textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:18 }}>Contact Us</h5>
                   <ul style={{ listStyle:'none', padding:0, margin:0 }}>
-                    {['📧  support@ami-health.com','📞  +1 (800) 264-7890','🕐  Available 24 / 7'].map((t,i)=>(
+                    {['📧  support@ami-health.com','📞  +91 (800) 264-7890','🕐  Available 24 / 7'].map((t,i)=>(
                       <li key={i} style={{ color:'rgba(214,226,240,0.78)', fontSize:'0.88rem', marginBottom:11 }}>{t}</li>
                     ))}
                   </ul>
@@ -398,8 +461,8 @@ function App() {
                   <address style={{ fontStyle:'normal', color:'rgba(214,226,240,0.78)', fontSize:'0.88rem', lineHeight:1.9 }}>
                     A.M.I. Healthcare Technologies<br />
                     Suite 400, 1200 Health Sciences Blvd<br />
-                    San Francisco, CA 94105<br />
-                    United States
+                    Pune, Maharashtra 411001<br />
+                    India
                   </address>
                 </div>
               </div>

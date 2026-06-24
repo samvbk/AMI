@@ -7,7 +7,7 @@ sudo systemctl start mysql 2>/dev/null || brew services start mysql 2>/dev/null 
 echo ""
 
 echo "Step 2: Checking database..."
-mysql -u root -p9850337042 -e "CREATE DATABASE IF NOT EXISTS healthcare; USE healthcare; SHOW TABLES;" 2>/dev/null
+mysql -u "${DB_USER:-root}" -p"${DB_PASSWORD}" -e "CREATE DATABASE IF NOT EXISTS healthcare; USE healthcare; SHOW TABLES;" 2>/dev/null
 echo ""
 
 echo "Step 3: Starting Backend Server..."

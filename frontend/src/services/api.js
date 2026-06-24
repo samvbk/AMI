@@ -1,15 +1,6 @@
-
-
-
-
-
-
-
-
-
 import axios from 'axios';
 
-const API_BASE = 'http://localhost:8000';
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 const api = axios.create({
   baseURL: API_BASE,
@@ -18,6 +9,32 @@ const api = axios.create({
     'Content-Type': 'application/json',
   }
 });
+
+// Intercept requests to attach JWT token
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('ami_token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+// Automatically clear token and reload on 401 Unauthorized
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response && error.response.status === 401) {
+      console.warn("401 Unauthorized - clearing token and returning to home");
+      localStorage.removeItem('ami_token');
+      window.dispatchEvent(new Event('ami_unauthorized'));
+    }
+    return Promise.reject(error);
+  }
+);
+
+export const logout = () => {
+  localStorage.removeItem('ami_token');
+};
 
 // Convert base64 to blob
 const dataURLtoBlob = (dataurl) => {
@@ -39,7 +56,7 @@ const dataURLtoBlob = (dataurl) => {
 };
 
 // Main chat function
-export const sendMessage = async (memberId, message, useAudio = true) => {
+export const sendMessage = async (memberId, message, useAudio = true, lat = null, lon = null) => {
   try {
     console.log('💬 Sending message:', message.substring(0, 50));
 
@@ -90,6 +107,30 @@ export const sendMessage = async (memberId, message, useAudio = true) => {
   }
 };
 
+// Face Quality Check
+export const checkFaceQuality = async (imageBase64) => {
+  try {
+    const blob = dataURLtoBlob(imageBase64);
+    if (!blob) throw new Error('Failed to convert image');
+
+    const formData = new FormData();
+    formData.append('image', blob, 'face.jpg');
+
+    const response = await api.post('/check-face', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+
+    return response.data;
+  } catch (error) {
+    console.error('Face quality check error:', error);
+    return {
+      success: false,
+      quality: 'poor',
+      message: 'Failed to check face quality. Ensure server is running.'
+    };
+  }
+};
+
 // Face recognition
 export const recognizeFace = async (imageBase64) => {
   try {
@@ -110,17 +151,22 @@ export const recognizeFace = async (imageBase64) => {
     console.log('Face recognition response:', response.data);
 
     if (response.data.success && response.data.recognized) {
+      if (response.data.token) {
+        localStorage.setItem('ami_token', response.data.token);
+      }
       return {
         success: true,
         recognized: true,
         member: response.data.member,
-        message: `Welcome back, ${response.data.member.name}!`
+        message: `Welcome back, ${response.data.member.name}!`,
+        top_matches: response.data.top_matches
       };
     } else {
       return {
         success: true,
         recognized: false,
-        message: response.data.message || 'Face not recognized. Please register.'
+        message: response.data.message || 'Face not recognized. Please register.',
+        top_matches: response.data.top_matches
       };
     }
 
@@ -130,6 +176,24 @@ export const recognizeFace = async (imageBase64) => {
       success: false,
       message: "Face recognition failed. Check camera permissions and backend connection."
     };
+  }
+};
+
+export const deleteAccount = async (memberId) => {
+  const response = await api.delete(`/member/${memberId}`);
+  return response.data;
+};
+
+export const loginOverride = async (memberId) => {
+  try {
+    const response = await api.post('/login-override', { member_id: memberId });
+    if (response.data.success && response.data.token) {
+      localStorage.setItem('ami_token', response.data.token);
+    }
+    return response.data;
+  } catch (error) {
+    console.error('Login Override error:', error);
+    return { success: false, message: 'Could not bypass login.' };
   }
 };
 
@@ -160,6 +224,9 @@ export const registerMember = async (memberData, imageBase64) => {
     console.log('Registration response:', response.data);
 
     if (response.data.success) {
+      if (response.data.token) {
+        localStorage.setItem('ami_token', response.data.token);
+      }
       return {
         success: true,
         member_id: response.data.member_id,
@@ -179,6 +246,17 @@ export const registerMember = async (memberData, imageBase64) => {
       success: false,
       message: 'Registration failed. Check backend connection.'
     };
+  }
+};
+
+// TTS API (Gemini via Backend)
+export const generateTTS = async (text, language = 'en-IN', voice = 'Kore') => {
+  try {
+    const response = await api.post('/tts', { text, language, voice });
+    return response.data;
+  } catch (error) {
+    console.error('TTS API error:', error);
+    return { success: false, error: 'Failed to generate TTS' };
   }
 };
 
@@ -208,6 +286,26 @@ export const getWeather = async (city = "Delhi") => {
   }
 };
 
+export const deleteMember = async (memberId) => {
+  try {
+    const response = await api.delete(`/member/${memberId}`);
+    return response.data;
+  } catch (error) {
+    console.error('API Error (deleteMember):', error);
+    return { success: false, message: 'Could not delete profile' };
+  }
+};
+
+export const updateMember = async (memberId, updates) => {
+  try {
+    const response = await api.put(`/member/${memberId}`, updates);
+    return response.data;
+  } catch (error) {
+    console.error('API Error (updateMember):', error);
+    return { success: false, message: 'Could not update profile' };
+  }
+};
+
 // Get audio file URL
 export const getAudioUrl = (filename) => {
   if (!filename) return null;
@@ -222,4 +320,40 @@ export const testBackend = async () => {
   } catch (error) {
     return { connected: false, error: error.message };
   }
+};
+
+export const getAudio = getAudioUrl;
+
+export const getMedications = async (memberId) => {
+  try {
+    const response = await api.get(`/medications/${memberId}`);
+    return response.data;
+  } catch (error) {
+    console.error('Medication fetch error:', error);
+    return { success: false, medications: [], logs: [], adherence: [] };
+  }
+};
+
+export const createMedication = async (payload) => {
+  const response = await api.post('/medications', payload);
+  return response.data;
+};
+
+export const updateMedication = async (id, payload) => {
+  const response = await api.put(`/medications/${id}`, payload);
+  return response.data;
+};
+
+export const deleteMedication = async (id) => {
+  const response = await api.delete(`/medications/${id}`);
+  return response.data;
+};
+
+export const logMedication = async (id, status = 'taken', extraFields = {}) => {
+  const response = await api.post(`/medications/${id}/log`, {
+    status,
+    taken_at: new Date().toISOString(),
+    ...extraFields
+  });
+  return response.data;
 };
