@@ -16,9 +16,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application files
 COPY . .
 
-# Expose port (Render sets the PORT environment variable)
-EXPOSE 8000
+# Expose port (Render/HF sets the PORT environment variable, defaults to 7860)
+EXPOSE 7860
 
 # Start server using uvicorn directly
-# Render will pass the dynamic PORT env var
-CMD ["sh", "-c", "uvicorn app:app --host 0.0.0.0 --port ${PORT:-8000}"]
+# Render/HF will pass the dynamic PORT env var
+CMD ["sh", "-c", "uvicorn app:app --host 0.0.0.0 --port ${PORT:-7860}"]
