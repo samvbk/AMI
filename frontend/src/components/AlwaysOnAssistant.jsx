@@ -53,7 +53,8 @@ export default function AlwaysOnAssistant({ member, onLogout }) {
     const fetchWeatherWithCoords = async (latitude, longitude) => {
       try {
         console.log(`Your coords: ${latitude}, ${longitude}`); // ← debug line
-        const response = await fetch(`http://localhost:8000/weather?lat=${latitude}&lon=${longitude}`);
+        const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+        const response = await fetch(`${API_BASE}/weather?lat=${latitude}&lon=${longitude}`);
         if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
         
         const data = await response.json();
@@ -234,8 +235,8 @@ export default function AlwaysOnAssistant({ member, onLogout }) {
   const handleNewsRequest = async () => {
     try {
       handleAssistantResponse("Fetching today's top headlines.", 'happy');
-
-      const response = await fetch('http://localhost:8000/news');
+      const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+      const response = await fetch(`${API_BASE}/news`);
       const data = await response.json();
 
       if (data.success && data.articles) {
@@ -256,7 +257,8 @@ export default function AlwaysOnAssistant({ member, onLogout }) {
 
   const fetchNewsDetail = async (index) => {
     try {
-      const response = await fetch(`http://localhost:8000/news-detail/${index}`);
+      const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+      const response = await fetch(`${API_BASE}/news-detail/${index}`);
       const data = await response.json();
 
       if (data.success) {

@@ -11,7 +11,8 @@ export default function FamilyRegistrationForm({ onSubmit, onCancel }) {
   useEffect(() => {
     const fetchFamilies = async () => {
       try {
-        const response = await fetch('http://localhost:8000/families');
+        const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+        const response = await fetch(`${API_BASE}/families`);
         const data = await response.json();
         if (data.success && data.families) {
           setExistingFamilies(data.families);
